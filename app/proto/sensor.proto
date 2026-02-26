@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+service SensorService {
+  rpc SendData (SensorData) returns (Ack);
+}
+
+message SensorData {
+  double temperature = 1;
+  double humidity = 2;
+  double current = 3;
+  double timestamp = 4;
+}
+
+message Ack {
+  string status = 1;
+}

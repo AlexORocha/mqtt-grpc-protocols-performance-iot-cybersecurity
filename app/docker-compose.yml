@@ -1,0 +1,93 @@
+services:
+
+  sensor:
+    build: ./sensor
+    container_name: sensor
+    depends_on:
+      - gateway
+    networks:
+      - iot_net
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: gateway
+    depends_on:
+      - mqtt
+      - grpc_server
+    networks:
+      - iot_net
+    environment:
+      - MODE=${MODE}
+      - USE_TLS=${USE_TLS}
+    volumes:
+      - ./certs:/certs
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: mqtt
+    ports:
+      - "1883:1883"
+      - "8883:8883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./certs:/certs
+    networks:
+      - iot_net
+
+  mqtt_logger:
+    build: ./mqtt_logger
+    container_name: mqtt_logger
+    depends_on:
+      - mqtt
+      - postgres
+    networks:
+      - iot_net
+    environment:
+      - USE_TLS=${USE_TLS}
+    volumes:
+      - ./certs:/certs
+
+  grpc_server:
+    build:
+      context: .
+      dockerfile: grpc_server/Dockerfile
+    container_name: grpc_server
+    depends_on:
+      - postgres
+    ports:
+      - "50051:50051"
+    networks:
+      - iot_net
+    environment:
+      - USE_TLS=${USE_TLS}
+    volumes:
+      - ./certs:/certs
+
+  postgres:
+    image: postgres:15
+    container_name: logger_db
+    environment:
+      POSTGRES_USER: iot
+      POSTGRES_PASSWORD: iot
+      POSTGRES_DB: iotlab
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./logger/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - iot_net
+
+  sniffer:
+    image: nicolaka/netshoot
+    container_name: sniffer
+    command: tcpdump -i eth0 -w /captures/capture.pcap
+    volumes:
+      - ./captures:/captures
+    networks:
+      - iot_net
+
+networks:
+  iot_net:
+    driver: bridge
