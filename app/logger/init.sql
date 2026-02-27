@@ -9,5 +9,6 @@ CREATE TABLE IF NOT EXISTS message_logs (
     server_timestamp DOUBLE PRECISION,
     latency_ms DOUBLE PRECISION,
     payload_size_bytes INTEGER,
+    payload_size_before_bytes INTEGER,
     created_at TIMESTAMP DEFAULT NOW()
 );

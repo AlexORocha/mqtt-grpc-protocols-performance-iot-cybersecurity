@@ -116,9 +116,10 @@ def on_message(client, userdata, msg):
                 client_timestamp,
                 server_timestamp,
                 latency_ms,
-                payload_size_bytes
+                payload_size_bytes,
+                payload_size_before_bytes
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             "mqtt",
             USE_TLS,
@@ -128,7 +129,8 @@ def on_message(client, userdata, msg):
             data.get("timestamp"),
             server_timestamp,
             latency_ms,
-            payload_size
+            payload_size,
+            data.get("payload_size_before")
         ))
         
         conn.commit()

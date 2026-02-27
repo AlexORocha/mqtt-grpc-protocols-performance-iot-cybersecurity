@@ -58,9 +58,10 @@ class SensorService(sensor_pb2_grpc.SensorServiceServicer):
                 client_timestamp,
                 server_timestamp,
                 latency_ms,
-                payload_size_bytes
+                payload_size_bytes,
+                payload_size_before_bytes
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             "grpc",
             USE_TLS,
@@ -70,7 +71,8 @@ class SensorService(sensor_pb2_grpc.SensorServiceServicer):
             request.timestamp,
             server_timestamp,
             latency_ms,
-            payload_size
+            payload_size,
+            request.payload_size_before if request.payload_size_before > 0 else None
         ))
 
         DB_CONN.commit()

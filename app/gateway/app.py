@@ -26,13 +26,14 @@ simulator = get_simulator()
 # ============================
 MODE = os.getenv("MODE", "mqtt").lower()
 USE_TLS = os.getenv("USE_TLS", "false").lower() == "true"
+ANALYZE_PAYLOAD_BEFORE = os.getenv("ANALYZE_PAYLOAD_BEFORE", "false").lower() == "true"
 
 MQTT_HOST = "mqtt"
 MQTT_TOPIC = "sensor/data"
 
 GRPC_HOST = "grpc_server:50051"
 
-print(f"Gateway starting | MODE={MODE} | TLS={USE_TLS}")
+print(f"Gateway starting | MODE={MODE} | TLS={USE_TLS} | ANALYZE_PAYLOAD_BEFORE={ANALYZE_PAYLOAD_BEFORE}")
 
 # ============================
 # MQTT CLIENT CONFIG (LAZY)
@@ -180,6 +181,12 @@ def receive_data():
     if not data:
         return jsonify({"error": "No JSON payload"}), 400
 
+    # Calculate payload size BEFORE serialization (if enabled)
+    if ANALYZE_PAYLOAD_BEFORE:
+        payload_json = json.dumps(data)
+        payload_size_before = len(payload_json.encode('utf-8'))
+        data['payload_size_before'] = payload_size_before
+
     start_time = time.time()
 
     try:
@@ -254,7 +261,8 @@ def send_via_grpc(data):
         humidity=data["humidity"],
         current=data["current"],
         timestamp=data["timestamp"],
-        padding=data.get("padding", "")  # Include padding if present
+        padding=data.get("padding", ""),  # Include padding if present
+        payload_size_before=data.get("payload_size_before", 0)  # Size before serialization
     )
     
     for attempt in range(max_retries):

@@ -37,6 +37,34 @@ def get_row_count(conn):
     cursor.close()
     return count
 
+def check_and_update_schema(conn):
+    """Check if payload_size_before_bytes column exists and add it if missing"""
+    cursor = conn.cursor()
+    
+    # Check if column exists
+    cursor.execute("""
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='message_logs' 
+        AND column_name='payload_size_before_bytes'
+    """)
+    
+    column_exists = cursor.fetchone() is not None
+    
+    if not column_exists:
+        print("\n🔧 Schema update needed: Adding payload_size_before_bytes column...")
+        cursor.execute("""
+            ALTER TABLE message_logs 
+            ADD COLUMN payload_size_before_bytes INTEGER
+        """)
+        conn.commit()
+        print("✅ Column added successfully")
+    else:
+        print("\n✅ Schema is up to date (payload_size_before_bytes column exists)")
+    
+    cursor.close()
+    return column_exists
+
 def clear_table(conn):
     """Clear all data from message_logs table"""
     cursor = conn.cursor()
@@ -53,6 +81,9 @@ def main():
     print("\n🔌 Connecting to database...")
     conn = connect_db()
     print("✅ Connected successfully")
+    
+    # Check and update schema if needed
+    check_and_update_schema(conn)
     
     # Get current row count
     row_count = get_row_count(conn)

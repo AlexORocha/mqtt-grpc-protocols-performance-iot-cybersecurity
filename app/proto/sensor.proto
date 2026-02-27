@@ -10,6 +10,7 @@ message SensorData {
   double current = 3;
   double timestamp = 4;
   string padding = 5;  // Optional field for payload size testing
+  int32 payload_size_before = 6;  // Size before serialization (original JSON size)
 }
 
 message Ack {
