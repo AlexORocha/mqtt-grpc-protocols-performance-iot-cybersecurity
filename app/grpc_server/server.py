@@ -5,8 +5,12 @@ import time
 import psycopg2
 import sensor_pb2
 import sensor_pb2_grpc
+from network_simulator import get_simulator
 
 USE_TLS = os.getenv("USE_TLS", "false").lower() == "true"
+
+# Initialize network simulator
+simulator = get_simulator()
 
 # Wait for PostgreSQL to be ready
 print("Waiting for PostgreSQL...")
@@ -32,12 +36,17 @@ for i in range(max_retries):
 class SensorService(sensor_pb2_grpc.SensorServiceServicer):
 
     def SendData(self, request, context):
-
+        # Simulate processing delay when receiving request
+        simulator.add_processing_delay()
+        
         server_timestamp = time.time()
         latency_ms = (server_timestamp - request.timestamp) * 1000
 
         payload_size = request.ByteSize()
 
+        # Simulate network latency before storing to DB
+        simulator.add_network_latency()
+        
         cursor = DB_CONN.cursor()
         cursor.execute("""
             INSERT INTO message_logs (

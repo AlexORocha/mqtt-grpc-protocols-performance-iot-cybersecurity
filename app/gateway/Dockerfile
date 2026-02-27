@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY gateway /app
 COPY proto /app/proto
+COPY network_simulator.py /app/
 
 RUN pip install flask paho-mqtt grpcio grpcio-tools
 

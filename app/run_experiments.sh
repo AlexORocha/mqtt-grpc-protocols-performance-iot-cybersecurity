@@ -9,7 +9,7 @@ SCENARIOS=(
   ".env.grpc_tls"
 )
 
-TARGET_ROWS=1000
+TARGET_ROWS=10000
 RESULTS_DIR="results"
 
 mkdir -p "$RESULTS_DIR"
@@ -17,6 +17,11 @@ mkdir -p "$RESULTS_DIR"
 echo "========================================"
 echo "STARTING FULL EXPERIMENT SUITE"
 echo "========================================"
+
+# Start PostgreSQL once (it will persist across all scenarios)
+echo "Starting PostgreSQL database..."
+docker compose up postgres -d
+sleep 5
 
 for ENV_FILE in "${SCENARIOS[@]}"
 do
@@ -31,8 +36,9 @@ do
   echo "Running scenario: $SCENARIO_NAME"
   echo "----------------------------------------"
 
-  # Limpeza total
-  docker compose down -v || true
+  # Stop only application containers (keep postgres running)
+  docker compose stop sensor gateway mqtt_logger grpc_server mqtt sniffer || true
+  docker compose rm -f sensor gateway mqtt_logger grpc_server mqtt sniffer || true
 
   # Remove captura antiga
   rm -f captures/capture.pcap || true
@@ -43,15 +49,21 @@ do
   echo "Waiting for containers to stabilize..."
   sleep 10
 
-  echo "Collecting data until $TARGET_ROWS rows..."
+  # Get initial count before starting this scenario
+  INITIAL_COUNT=$(docker exec logger_db psql -U iot -d iotlab -t -c "SELECT COUNT(*) FROM message_logs;" | xargs)
+  TARGET_TOTAL=$((INITIAL_COUNT + TARGET_ROWS))
+
+  echo "Initial rows in database: $INITIAL_COUNT"
+  echo "Collecting data until $TARGET_TOTAL rows (adding $TARGET_ROWS new rows)..."
 
   while true
   do
     COUNT=$(docker exec logger_db psql -U iot -d iotlab -t -c "SELECT COUNT(*) FROM message_logs;" | xargs)
+    NEW_ROWS=$((COUNT - INITIAL_COUNT))
 
-    echo "Current rows: $COUNT"
+    echo "Total rows: $COUNT | New rows from this scenario: $NEW_ROWS / $TARGET_ROWS"
 
-    if [ "$COUNT" -ge "$TARGET_ROWS" ]; then
+    if [ "$COUNT" -ge "$TARGET_TOTAL" ]; then
       break
     fi
 
@@ -77,14 +89,25 @@ do
     mv captures/capture.pcap "$RESULTS_DIR/${SCENARIO_NAME}.pcap"
   fi
 
-  echo "Stopping scenario..."
-  docker compose down -v
+  echo "Stopping application containers..."
+  docker compose stop sensor gateway mqtt_logger grpc_server mqtt sniffer || true
 
   echo "Scenario $SCENARIO_NAME completed."
 done
+
+# Stop all application containers but keep postgres running
+echo ""
+echo "Stopping application containers (keeping postgres running)..."
+docker compose stop sensor gateway mqtt_logger grpc_server mqtt sniffer || true
+docker compose rm -f sensor gateway mqtt_logger grpc_server mqtt sniffer || true
 
 echo ""
 echo "========================================"
 echo "ALL EXPERIMENTS COMPLETED"
 echo "Results saved in /$RESULTS_DIR"
+echo ""
+echo "📊 PostgreSQL is still running with ALL data"
+echo "   Run 'python analyze_payload.py' to analyze"
+echo ""
+echo "To stop postgres: docker compose stop postgres"
 echo "========================================"

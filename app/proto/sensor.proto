@@ -9,6 +9,7 @@ message SensorData {
   double humidity = 2;
   double current = 3;
   double timestamp = 4;
+  string padding = 5;  // Optional field for payload size testing
 }
 
 message Ack {

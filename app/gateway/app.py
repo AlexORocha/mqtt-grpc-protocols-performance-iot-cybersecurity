@@ -13,8 +13,13 @@ import grpc
 import sensor_pb2
 import sensor_pb2_grpc
 
+# Network Simulator
+from network_simulator import get_simulator
 
 app = Flask(__name__)
+
+# Initialize network simulator
+simulator = get_simulator()
 
 # ============================
 # ENV CONFIG
@@ -167,6 +172,9 @@ def get_grpc_stub():
 
 @app.route("/data", methods=["POST"])
 def receive_data():
+    # Simulate processing delay when receiving data
+    simulator.add_processing_delay()
+    
     data = request.json
 
     if not data:
@@ -175,6 +183,9 @@ def receive_data():
     start_time = time.time()
 
     try:
+        # Simulate network latency before forwarding
+        simulator.add_network_latency()
+        
         if MODE == "mqtt":
             send_via_mqtt(data)
         elif MODE == "grpc":
@@ -242,7 +253,8 @@ def send_via_grpc(data):
         temperature=data["temperature"],
         humidity=data["humidity"],
         current=data["current"],
-        timestamp=data["timestamp"]
+        timestamp=data["timestamp"],
+        padding=data.get("padding", "")  # Include padding if present
     )
     
     for attempt in range(max_retries):

@@ -8,6 +8,10 @@ import psycopg2
 from psycopg2 import pool
 import paho.mqtt.client as mqtt
 
+# Add parent directory to path for imports
+sys.path.insert(0, '/app')
+from network_simulator import get_simulator
+
 USE_TLS = os.getenv("USE_TLS", "false").lower() == "true"
 
 MQTT_HOST = "mqtt"
@@ -15,6 +19,9 @@ MQTT_PORT = 8883 if USE_TLS else 1883
 MQTT_TOPIC = "sensor/data"
 
 print(f"MQTT Logger starting | TLS={USE_TLS}")
+
+# Initialize network simulator
+simulator = get_simulator()
 
 # ===============================
 # DATABASE CONNECTION POOL
@@ -83,12 +90,18 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     conn = None
     try:
+        # Simulate processing delay when receiving message
+        simulator.add_processing_delay()
+        
         data = json.loads(msg.payload.decode())
 
         server_timestamp = time.time()
         latency_ms = (server_timestamp - data["timestamp"]) * 1000
         payload_size = len(msg.payload)
 
+        # Simulate network latency before storing to DB
+        simulator.add_network_latency()
+        
         # Get connection from pool
         conn = get_db_connection()
         cursor = conn.cursor()

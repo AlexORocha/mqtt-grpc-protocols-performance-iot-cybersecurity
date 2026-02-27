@@ -1,12 +1,22 @@
 services:
 
   sensor:
-    build: ./sensor
+    build:
+      context: .
+      dockerfile: sensor/Dockerfile
     container_name: sensor
     depends_on:
       - gateway
     networks:
       - iot_net
+    environment:
+      - ENABLE_NETWORK_SIMULATION=${ENABLE_NETWORK_SIMULATION:-false}
+      - NETWORK_LATENCY_MIN_MS=${NETWORK_LATENCY_MIN_MS:-5}
+      - NETWORK_LATENCY_MAX_MS=${NETWORK_LATENCY_MAX_MS:-50}
+      - PROCESSING_DELAY_MIN_MS=${PROCESSING_DELAY_MIN_MS:-1}
+      - PROCESSING_DELAY_MAX_MS=${PROCESSING_DELAY_MAX_MS:-10}
+      - PAYLOAD_SIZE_MIN_BYTES=${PAYLOAD_SIZE_MIN_BYTES:-100}
+      - PAYLOAD_SIZE_MAX_BYTES=${PAYLOAD_SIZE_MAX_BYTES:-1000}
 
   gateway:
     build:
@@ -23,6 +33,11 @@ services:
     environment:
       - MODE=${MODE}
       - USE_TLS=${USE_TLS}
+      - ENABLE_NETWORK_SIMULATION=${ENABLE_NETWORK_SIMULATION:-false}
+      - NETWORK_LATENCY_MIN_MS=${NETWORK_LATENCY_MIN_MS:-5}
+      - NETWORK_LATENCY_MAX_MS=${NETWORK_LATENCY_MAX_MS:-50}
+      - PROCESSING_DELAY_MIN_MS=${PROCESSING_DELAY_MIN_MS:-1}
+      - PROCESSING_DELAY_MAX_MS=${PROCESSING_DELAY_MAX_MS:-10}
     volumes:
       - ./certs:/certs
 
@@ -39,7 +54,9 @@ services:
       - iot_net
 
   mqtt_logger:
-    build: ./mqtt_logger
+    build:
+      context: .
+      dockerfile: mqtt_logger/Dockerfile
     container_name: mqtt_logger
     depends_on:
       - mqtt
@@ -48,6 +65,11 @@ services:
       - iot_net
     environment:
       - USE_TLS=${USE_TLS}
+      - ENABLE_NETWORK_SIMULATION=${ENABLE_NETWORK_SIMULATION:-false}
+      - NETWORK_LATENCY_MIN_MS=${NETWORK_LATENCY_MIN_MS:-5}
+      - NETWORK_LATENCY_MAX_MS=${NETWORK_LATENCY_MAX_MS:-50}
+      - PROCESSING_DELAY_MIN_MS=${PROCESSING_DELAY_MIN_MS:-1}
+      - PROCESSING_DELAY_MAX_MS=${PROCESSING_DELAY_MAX_MS:-10}
     volumes:
       - ./certs:/certs
 
@@ -65,6 +87,11 @@ services:
       - iot_net
     environment:
       - USE_TLS=${USE_TLS}
+      - ENABLE_NETWORK_SIMULATION=${ENABLE_NETWORK_SIMULATION:-false}
+      - NETWORK_LATENCY_MIN_MS=${NETWORK_LATENCY_MIN_MS:-5}
+      - NETWORK_LATENCY_MAX_MS=${NETWORK_LATENCY_MAX_MS:-50}
+      - PROCESSING_DELAY_MIN_MS=${PROCESSING_DELAY_MIN_MS:-1}
+      - PROCESSING_DELAY_MAX_MS=${PROCESSING_DELAY_MAX_MS:-10}
     volumes:
       - ./certs:/certs
     healthcheck:
@@ -82,7 +109,7 @@ services:
       POSTGRES_PASSWORD: iot
       POSTGRES_DB: iotlab
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - ./logger/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
