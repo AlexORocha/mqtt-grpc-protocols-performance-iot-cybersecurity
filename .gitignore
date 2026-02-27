@@ -1,2 +1,10 @@
 .env
 results/
+app/certs/ca.crt
+app/certs/ca.key
+app/certs/ca.srl
+app/certs/index.txt
+app/certs/serial
+app/certs/server.crt
+app/certs/server.csr
+app/certs/server.key
