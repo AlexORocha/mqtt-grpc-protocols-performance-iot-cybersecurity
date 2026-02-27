@@ -14,8 +14,10 @@ services:
       dockerfile: gateway/Dockerfile
     container_name: gateway
     depends_on:
-      - mqtt
-      - grpc_server
+      mqtt:
+        condition: service_started
+      grpc_server:
+        condition: service_healthy
     networks:
       - iot_net
     environment:
@@ -55,7 +57,8 @@ services:
       dockerfile: grpc_server/Dockerfile
     container_name: grpc_server
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "50051:50051"
     networks:
@@ -64,6 +67,12 @@ services:
       - USE_TLS=${USE_TLS}
     volumes:
       - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "50051"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   postgres:
     image: postgres:15
@@ -78,6 +87,12 @@ services:
       - ./logger/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - iot_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iot -d iotlab"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   sniffer:
     image: nicolaka/netshoot

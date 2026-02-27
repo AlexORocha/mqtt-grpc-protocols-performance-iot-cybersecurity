@@ -8,12 +8,26 @@ import sensor_pb2_grpc
 
 USE_TLS = os.getenv("USE_TLS", "false").lower() == "true"
 
-DB_CONN = psycopg2.connect(
-    host="postgres",
-    database="iotlab",
-    user="iot",
-    password="iot"
-)
+# Wait for PostgreSQL to be ready
+print("Waiting for PostgreSQL...")
+max_retries = 30
+for i in range(max_retries):
+    try:
+        DB_CONN = psycopg2.connect(
+            host="postgres",
+            database="iotlab",
+            user="iot",
+            password="iot"
+        )
+        print("Connected to PostgreSQL successfully")
+        break
+    except psycopg2.OperationalError as e:
+        if i < max_retries - 1:
+            print(f"PostgreSQL not ready yet (attempt {i + 1}/{max_retries}), waiting...")
+            time.sleep(1)
+        else:
+            print(f"Failed to connect to PostgreSQL after {max_retries} attempts")
+            raise
 
 class SensorService(sensor_pb2_grpc.SensorServiceServicer):
 
@@ -57,12 +71,14 @@ class SensorService(sensor_pb2_grpc.SensorServiceServicer):
 
 
 def serve():
+    print(f"Starting gRPC server | TLS={USE_TLS}")
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     sensor_pb2_grpc.add_SensorServiceServicer_to_server(
         SensorService(), server
     )
 
     if USE_TLS:
+        print("Configuring TLS...")
         with open("/certs/server.key", "rb") as f:
             private_key = f.read()
         with open("/certs/server.crt", "rb") as f:
@@ -73,10 +89,13 @@ def serve():
         )
 
         server.add_secure_port("[::]:50051", credentials)
+        print("gRPC server listening on port 50051 with TLS")
     else:
         server.add_insecure_port("[::]:50051")
+        print("gRPC server listening on port 50051 without TLS")
 
     server.start()
+    print("gRPC server started successfully - ready to accept connections")
     server.wait_for_termination()
 
 

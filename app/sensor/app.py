@@ -14,4 +14,4 @@ while True:
     requests.post("http://gateway:8000/data", json=payload)
     print("Data sent:", payload)
 
-    time.sleep(0.1)
+    time.sleep(0.01)

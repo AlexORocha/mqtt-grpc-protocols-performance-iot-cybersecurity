@@ -29,23 +29,43 @@ GRPC_HOST = "grpc_server:50051"
 print(f"Gateway starting | MODE={MODE} | TLS={USE_TLS}")
 
 # ============================
-# gRPC CHANNEL CONFIG
+# gRPC CHANNEL CONFIG (LAZY)
 # ============================
 
-if MODE == "grpc":
+# Don't create channel at startup - create it on first use
+grpc_channel = None
+grpc_stub = None
+
+def get_grpc_stub():
+    """Get or create gRPC stub (lazy initialization)"""
+    global grpc_channel, grpc_stub
+    
+    if grpc_stub is not None:
+        return grpc_stub
+    
+    print(f"Initializing gRPC channel to {GRPC_HOST}...")
+    
     if USE_TLS:
         print("gRPC using TLS")
-
         with open("/certs/ca.crt", "rb") as f:
             trusted_certs = f.read()
-
-        credentials = grpc.ssl_channel_credentials(trusted_certs)
-        channel = grpc.secure_channel(GRPC_HOST, credentials)
+        credentials = grpc.ssl_channel_credentials(
+            root_certificates=trusted_certs
+        )
+        grpc_channel = grpc.secure_channel(GRPC_HOST, credentials)
     else:
         print("gRPC WITHOUT TLS")
-        channel = grpc.insecure_channel(GRPC_HOST)
-
-    stub = sensor_pb2_grpc.SensorServiceStub(channel)
+        grpc_channel = grpc.insecure_channel(
+            GRPC_HOST,
+            options=[
+                ('grpc.enable_http_proxy', 0),
+                ('grpc.dns_min_time_between_resolutions_ms', 10000),
+            ]
+        )
+    
+    grpc_stub = sensor_pb2_grpc.SensorServiceStub(grpc_channel)
+    print("gRPC channel initialized successfully")
+    return grpc_stub
 
 
 # ============================
@@ -90,13 +110,16 @@ def send_via_mqtt(data):
     payload = json.dumps(data)
 
     if USE_TLS:
+        import ssl
         publish.single(
             MQTT_TOPIC,
             payload,
             hostname=MQTT_HOST,
             port=8883,
             tls={
-                "ca_certs": "/certs/ca.crt"
+                "ca_certs": "/certs/ca.crt",
+                "cert_reqs": ssl.CERT_REQUIRED,
+                "tls_version": ssl.PROTOCOL_TLS
             }
         )
     else:
@@ -113,15 +136,35 @@ def send_via_mqtt(data):
 # ============================
 
 def send_via_grpc(data):
-
+    """Send data via gRPC with retry logic"""
+    max_retries = 3
+    retry_delay = 0.5
+    
     message = sensor_pb2.SensorData(
         temperature=data["temperature"],
         humidity=data["humidity"],
         current=data["current"],
         timestamp=data["timestamp"]
     )
-
-    stub.SendData(message)
+    
+    for attempt in range(max_retries):
+        try:
+            stub = get_grpc_stub()
+            stub.SendData(message, timeout=5.0)
+            return  # Success!
+        except grpc.RpcError as e:
+            if attempt < max_retries - 1:
+                if e.code() == grpc.StatusCode.UNAVAILABLE:
+                    print(f"gRPC server unavailable (attempt {attempt + 1}/{max_retries}), retrying...")
+                    time.sleep(retry_delay)
+                    # Reset stub to force reconnection
+                    global grpc_stub, grpc_channel
+                    grpc_stub = None
+                    if grpc_channel:
+                        grpc_channel.close()
+                        grpc_channel = None
+                    continue
+            raise  # Re-raise if last attempt or different error
 
 
 # ============================

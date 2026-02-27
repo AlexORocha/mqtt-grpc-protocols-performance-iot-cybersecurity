@@ -12,7 +12,7 @@ SCENARIOS=(
 TARGET_ROWS=1000
 RESULTS_DIR="results"
 
-mkdir -p $RESULTS_DIR
+mkdir -p "$RESULTS_DIR"
 
 echo "========================================"
 echo "STARTING FULL EXPERIMENT SUITE"
@@ -20,7 +20,12 @@ echo "========================================"
 
 for ENV_FILE in "${SCENARIOS[@]}"
 do
-  SCENARIO_NAME=$(basename $ENV_FILE .env)
+  # Remove prefix ".env."
+  CLEAN_NAME=${ENV_FILE/.env./}
+
+  # Nome final padronizado
+  SCENARIO_NAME="results_${CLEAN_NAME}"
+
   echo ""
   echo "----------------------------------------"
   echo "Running scenario: $SCENARIO_NAME"
@@ -29,11 +34,11 @@ do
   # Limpeza total
   docker compose down -v || true
 
-  # Limpa capturas antigas
+  # Remove captura antiga
   rm -f captures/capture.pcap || true
 
   # Sobe ambiente
-  docker compose --env-file $ENV_FILE up --build -d
+  docker compose --env-file "$ENV_FILE" up --build -d
 
   echo "Waiting for containers to stabilize..."
   sleep 10
@@ -55,22 +60,24 @@ do
 
   echo "Target reached. Collecting metrics..."
 
-  # Export database results
-  docker exec logger_db psql -U iot -d iotlab -c "\copy message_logs to '/tmp/${SCENARIO_NAME}.csv' csv header"
-  docker cp logger_db:/tmp/${SCENARIO_NAME}.csv $RESULTS_DIR/${SCENARIO_NAME}.csv
+  # Exporta dados do banco
+  docker exec logger_db psql -U iot -d iotlab \
+    -c "\copy message_logs to '/tmp/${SCENARIO_NAME}.csv' csv header"
+
+  docker cp logger_db:/tmp/${SCENARIO_NAME}.csv \
+    "$RESULTS_DIR/${SCENARIO_NAME}.csv"
 
   # Coleta stats dos containers
   docker stats --no-stream --format \
   "{{.Name}},{{.CPUPerc}},{{.MemUsage}}" \
-  > $RESULTS_DIR/${SCENARIO_NAME}_stats.csv
+  > "$RESULTS_DIR/${SCENARIO_NAME}_stats.csv"
 
-  # Salva PCAP se existir
+  # Salva PCAP
   if [ -f captures/capture.pcap ]; then
-    mv captures/capture.pcap $RESULTS_DIR/${SCENARIO_NAME}.pcap
+    mv captures/capture.pcap "$RESULTS_DIR/${SCENARIO_NAME}.pcap"
   fi
 
   echo "Stopping scenario..."
-
   docker compose down -v
 
   echo "Scenario $SCENARIO_NAME completed."
@@ -79,5 +86,5 @@ done
 echo ""
 echo "========================================"
 echo "ALL EXPERIMENTS COMPLETED"
-echo "Results saved in /results"
+echo "Results saved in /$RESULTS_DIR"
 echo "========================================"

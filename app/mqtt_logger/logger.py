@@ -101,9 +101,11 @@ client.on_disconnect = on_disconnect
 if USE_TLS:
     client.tls_set(
         ca_certs="/certs/ca.crt",
-        tls_version=ssl.PROTOCOL_TLS_CLIENT
+        cert_reqs=ssl.CERT_REQUIRED,
+        tls_version=ssl.PROTOCOL_TLS
     )
-    client.tls_insecure_set(True)
+    # Don't check hostname for self-signed certs in Docker network
+    client.tls_insecure_set(False)
 
 client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
 

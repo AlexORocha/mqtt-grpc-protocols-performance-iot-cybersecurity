@@ -11,10 +11,13 @@ from scipy.stats import ttest_ind
 # LOAD DATA
 # =========================
 
-files = glob.glob("results_*.csv")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RESULTS_DIR = os.path.join(BASE_DIR, "results")
+
+files = glob.glob(os.path.join(RESULTS_DIR, "*.csv"))
 
 if not files:
-    print("No CSV files found.")
+    print("No CSV files found in:", RESULTS_DIR)
     exit()
 
 df_list = [pd.read_csv(f) for f in files]
